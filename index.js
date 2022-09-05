@@ -19,7 +19,7 @@ let exerciseSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  date: Date,
+  date: String,
   _id : {id:false}
 });
 //let Exercise = mongoose.model('Exercise', exerciseSchema);
@@ -51,8 +51,6 @@ app.use(bodyParser.urlencoded({extended: false}));
 //You can POST to /api/users with form data username to create a new user.
 //The returned response from POST /api/users with form data username will be an object with username and _id properties.
 app.post("/api/users", function(req, res){
-  User.deleteMany({});
-  
   const username = req.body.username;
   let newUser = new User({
     username: username
@@ -87,17 +85,23 @@ app.post("/api/users/:_id/exercises", function(req, res){
     if(err){
       console.error(err);
     }else{
-      var date;
+      var date = "";
+      
       if(req.body.date){
-        date = new Date(req.body.date);
-      }else{
-        date = new Date();
+        let inDate = new Date(req.body.date).toDateString();
+        if(inDate != "Invalid Date"){
+          date = inDate;
+        }else{
+          date = "";
+        }
+      }else if( req.body.date == "" || req.body.date == undefined ){
+        date = new Date().toDateString();
       }
-
+      
       exerciseSchema = {
         description: req.body.description,
         duration: req.body.duration,
-        date: date.toDateString()
+        date: date
       };
       
       user.exercises.push(exerciseSchema);
@@ -125,6 +129,43 @@ app.post("/api/users/:_id/exercises", function(req, res){
 //The date property of any object in the log array that is returned from GET /api/users/:_id/logs should be a string. Use the dateString format of the Date API.
 //You can add from, to and limit parameters to a GET /api/users/:_id/logs request to retrieve part of the log of any user. from and to are dates in yyyy-mm-dd format. limit is an integer of how many logs to send back.
 app.get("/api/users/:_id/logs", function(req, res){
+  var limit = req.query.limit;
+  var from = req.query.from;
+  var to = req.query.to;
+
+  User.findOne({'_id': req.params._id}, function(err, user){
+    if(err){
+      console.error(err);
+    }else{
+      var logResults = user.exercises;
+      let fromDate = new Date(from);
+      let toDate = new Date(to);
+      
+      if(from){
+        logResults = logResults.filter(exe => new Date(exe.date) > fromDate);
+      }
+
+      if(to){
+        logResults = logResults.filter(exe => new Date(exe.date) < toDate);
+      }
+      
+      if(limit){
+        logResults = logResults.slice(0,limit);
+      }
+      
+      const count = user.exercises.length;
+      
+      userObj = {
+        username: user.username,
+        _id: user._id,
+        count: count,
+        log: logResults
+      }
+
+      res.json(userObj);
+    }
+  });
+  
   
 });
 
